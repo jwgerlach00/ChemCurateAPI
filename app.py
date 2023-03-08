@@ -27,6 +27,10 @@ CORS(app, supports_credentials=True)
 def query_filter(items, value) -> list:
     return list(filter(lambda e: (e or '').lower().find((value or '').lower()) > -1, items))[:10]
 
+@app.route('/get_uniprot_map', methods=['GET'])
+def get_uniprot_map() -> dict:
+    return uniprot_mapping_filtered
+
 @app.route('/get_organisms', methods=['GET'])
 def get_organisms() -> list:
     return display_names
