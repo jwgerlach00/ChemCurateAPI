@@ -1,47 +1,48 @@
 import flask
 from flask import Flask, request
 from flask_cors import CORS
-# import chemcuratepi
 from chemcurate import uniprot_mapping_filtered
-# import yaml
 
-# with open('test.yaml') as f:
-#     uniprot_mapping_filtered = yaml.load(f, Loader=yaml.FullLoader)
+
+display_name_mapper = {}
+display_names = []
+for key in list(uniprot_mapping_filtered.keys()):
+    common_name = uniprot_mapping_filtered[key]['common_name']
+    display_names.append(f'{key} ("{common_name}")' if common_name else key)
+    display_name_mapper[display_names[-1]] = key
+
+protein_display_name_mapper = {}
+for key in list(uniprot_mapping_filtered.keys()):
+    names = list(uniprot_mapping_filtered[key]['protein'].keys())
+    
+    for i in range(len(names)):
+        names[i] += ' ({0})'.format(', '.join(uniprot_mapping_filtered[key]['protein'][names[i]]))
+    
+    protein_display_name_mapper[key] = names
 
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
+def query_filter(items, value) -> list:
+    return list(filter(lambda e: (e or '').lower().find((value or '').lower()) > -1, items))[:10]
+
 @app.route('/get_organisms', methods=['GET'])
 def get_organisms() -> list:
-    print('ape')
-    return list(uniprot_mapping_filtered.keys())
-
-@app.route('/proteins_for_organisms', methods=['POST'])
-def proteins_for_organisms() -> list:
-    organisms = request.get_json()['organisms']
-    # print(organisms)
-    # return '', 204
-    return list(uniprot_mapping_filtered[organisms[0]]['protein'].keys())
-
-def query_filter(items, value) -> list:
-    return list(filter(lambda e: (e or '').lower().find((value or '').lower()) > -1, items))
+    return display_names
 
 @app.route('/query_organism_selections', methods=['POST'])
-def query_organism_selections() -> dict:
+def query_organism_selections() -> list:
     query = request.get_json()['query']
-    keys = query_filter(list(uniprot_mapping_filtered.keys()), query)
-    
-    out = {}
-    for key in keys:
-        out[key] = uniprot_mapping_filtered[key]
-        
-    return out
+    names = query_filter(display_names, query)
+    return names
 
-# @app.route('/a', methods=['GET'])
-# def a() -> dict:
-#     return {'a': 'b',
-#             'b': 'c'}
+@app.route('/query_protein_selections', methods=['POST'])
+def query_protein_selections() -> dict:
+    data = request.get_json()
+    organism = display_name_mapper[data['organism']]
+    proteins = query_filter(protein_display_name_mapper[organism], data['query'])
+    return proteins
 
 
 if __name__ == '__main__':
