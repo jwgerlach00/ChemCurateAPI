@@ -5,49 +5,35 @@ from chemcurate import uniprot_mapping_filtered
 
 
 display_name_mapper = {}
-display_names = []
-for key in list(uniprot_mapping_filtered.keys()):
-    common_name = uniprot_mapping_filtered[key]['common_name']
-    display_names.append(f'{key} ("{common_name}")' if common_name else key)
-    display_name_mapper[display_names[-1]] = key
-
+organism_display_name_mapper = {}
 protein_display_name_mapper = {}
 for key in list(uniprot_mapping_filtered.keys()):
-    names = list(uniprot_mapping_filtered[key]['protein'].keys())
+    common_name = uniprot_mapping_filtered[key]['common_name']
     
-    for i in range(len(names)):
-        names[i] += ' ({0})'.format(', '.join(uniprot_mapping_filtered[key]['protein'][names[i]]))
+    organism_display_name = f'{key} ("{common_name}")' if common_name else key
+    organism_display_name_mapper[organism_display_name] = key
     
-    protein_display_name_mapper[key] = names
+    protein_names = list(uniprot_mapping_filtered[key]['protein'].keys())
+    
+    protein_display_names = []
+    for protein in protein_names:
+        protein_display_names.append('{0} - {1} ({2})'.format(key, protein, ', '.join(uniprot_mapping_filtered[key]['protein'][protein])))
+        protein_display_name_mapper[protein_display_names[-1]] = protein
+    
+    display_name_mapper[organism_display_name] = protein_display_names
 
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
-def query_filter(items, value) -> list:
-    return list(filter(lambda e: (e or '').lower().find((value or '').lower()) > -1, items))[:10]
-
 @app.route('/get_uniprot_map', methods=['GET'])
 def get_uniprot_map() -> dict:
-    return uniprot_mapping_filtered
+    return display_name_mapper
 
-@app.route('/get_organisms', methods=['GET'])
-def get_organisms() -> list:
-    return display_names
-
-@app.route('/query_organism_selections', methods=['POST'])
-def query_organism_selections() -> list:
-    query = request.get_json()['query']
-    names = query_filter(display_names, query)
-    return names
-
-@app.route('/query_protein_selections', methods=['POST'])
-def query_protein_selections() -> dict:
+@app.route('/submit', methods=['GET'])
+def submit():
     data = request.get_json()
-    organism = display_name_mapper[data['organism']]
-    proteins = query_filter(protein_display_name_mapper[organism], data['query'])
-    return proteins
-
+    return '', 204
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5006, debug=True)
