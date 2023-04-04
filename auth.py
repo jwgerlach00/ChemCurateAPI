@@ -3,7 +3,7 @@ from werkzeug.security import check_password_hash
 from flask_login import login_user, login_required, current_user, logout_user
 from flask import session
 
-from db import db, User
+from db import user_db, User
 
 
 auth = Blueprint('auth', __name__)
@@ -51,7 +51,7 @@ def register():
     if User.query.filter_by(username=username).first():
         return redirect(url_for('auth.exists'))
     else:
-        db.add_user(username, pw)
+        user_db.add_user(username, pw)
 
     return 'register_success', 204
 

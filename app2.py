@@ -3,7 +3,7 @@ from flask_cors import CORS
 from flask_login import LoginManager
 from flask_session import Session
 
-from db import db, User
+from db import user_db, User
 
 
 def create_app():
@@ -23,9 +23,9 @@ def create_app():
     CORS(app, supports_credentials=True)
 
     # --------------------------------- DATABASE --------------------------------- #
-    db.init_app(app)
+    user_db.init_app(app)
     with app.app_context():
-        db.create_all()
+        user_db.create_all()
     
     # ------------------------------- LOGIN MANAGER ------------------------------ #
     login_manager = LoginManager()
