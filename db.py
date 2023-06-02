@@ -17,11 +17,3 @@ class User(UserMixin, user_db.Model):
     id = user_db.Column(user_db.Integer, primary_key=True)
     username = user_db.Column(user_db.String(100), unique=True)
     password = user_db.Column(user_db.String(100))
-
-class DataDB(SQLAlchemy):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        
-    def add_chembl(self, chembl_id:str, smiles:str) -> None:
-        self.session.add(Chembl(chembl_id=chembl_id, smiles=smiles))
-        self.session.commit()

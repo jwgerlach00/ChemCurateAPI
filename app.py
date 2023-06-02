@@ -1,66 +1,53 @@
-import flask
-from flask import Flask, request
+from flask import Flask
 from flask_cors import CORS
-from chemcurate import uniprot_mapping_filtered, Chembl, PubChem
+from flask_login import LoginManager
+from flask_session import Session
+
+from db import user_db, User
+
+import pandas as pd
+chembl_df = pd.read_csv('chembl_sample.csv')
 
 
-display_name_mapper = {}
-organism_display_name_mapper = {}
-protein_display_name_mapper = {}
-for key in list(uniprot_mapping_filtered.keys()):
-    common_name = uniprot_mapping_filtered[key]['common_name']
-    
-    organism_display_name = f'{key} ("{common_name}")' if common_name else key
-    organism_display_name_mapper[organism_display_name] = key
-    
-    protein_names = list(uniprot_mapping_filtered[key]['protein'].keys())
-    
-    protein_display_names = []
-    for protein in protein_names:
-        protein_display_names.append('{0} ({1})'.format(protein, ', '.join(uniprot_mapping_filtered[key]['protein'][protein])))
-        protein_display_name_mapper[protein_display_names[-1]] = protein
-    
-    display_name_mapper[organism_display_name] = protein_display_names
-    
+def create_app():
+    app = Flask(__name__)
 
-def undo_display_names(organism_protein_map:dict) -> dict:
-    out = {}
-    for (organism, proteins) in organism_protein_map.items():
-        organism_name = organism_display_name_mapper[organism]
-        protein_names = [protein_display_name_mapper[p] for p in proteins]
-        out[organism] = []
-        for p in protein_names:
-            out[organism] += uniprot_mapping_filtered[organism_name]['protein'][p]
-    return out
+    # ---------------------------------- SESSION --------------------------------- #
+    app.config['SESSION_PERMANENT'] = False
+    app.config['SESSION_TYPE'] = 'filesystem'  # Temporary hard-drive storage
+    Session(app)
 
+    # -------------------------------- APP CONFIG -------------------------------- #
+    app.config['SESSION_FILE_THRESHOLD'] = 10
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
+    app.secret_key = 'SUKJFIGYRHOWBLUHFFFAOYSANRYYVLZVUVIJVGHUHFFFAOYSAN'  # NaClo-Caffeine
 
-app = Flask(__name__)
-CORS(app, supports_credentials=True)
+    # ----------------------------------- CORS ----------------------------------- #
+    CORS(app, supports_credentials=True)
 
-@app.route('/get_uniprot_map', methods=['GET'])
-def get_uniprot_map() -> dict:
-    return display_name_mapper
-
-@app.route('/submit', methods=['POST'])
-def submit():
-    data = request.get_json()
-    databases = [d.lower() for d in data['databases']]
-    organism_uniprot_map = undo_display_names(data['organism_protein_map'])
+    # --------------------------------- DATABASE --------------------------------- #
+    user_db.init_app(app)
+    with app.app_context():
+        user_db.create_all()
     
-    try:
-        for organism, uniprots in organism_uniprot_map.items():
-            if 'pubchem' in databases:
-                pubchem = PubChem(uniprots)
-                print(pubchem)
-            if 'chembl' in databases:
-                chembl = Chembl(uniprots)
-                
-        return '', 204
+    # ------------------------------- LOGIN MANAGER ------------------------------ #
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.session_protection = None
     
-    except Exception as e:
-        print(e)
-        return {'error': str(e)}, 500
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))  # User primary key (ID) to query for user
+    
+    from auth import auth as auth_blueprint
+    app.register_blueprint(auth_blueprint)
+    
+    from main import main as main_blueprint
+    app.register_blueprint(main_blueprint)
+    
+    return app
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5006, debug=True)
+    app = create_app()
+    app.run(host='0.0.0.0', port='5006', debug=True)
